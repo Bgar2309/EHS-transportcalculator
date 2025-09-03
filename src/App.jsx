@@ -3,8 +3,7 @@ import './App.css'
 import { loadProductsData, loadTransportData } from './utils/excelLoader'
 import { 
   calculerPaletisationReference, 
-  agregerPaletisations,
-  genererCombinaisons 
+  agregerPaletisations
 } from './utils/calculator'
 import { obtenirPrixParType } from './utils/pricing'
 
@@ -328,15 +327,6 @@ function App() {
     <div className="app-container">
       <div className="header">
         <h1 className="title">Calculateur de Transport EHS</h1>
-        <p className="subtitle">Multi-références - Version Web</p>
-        <div className="status-bar">
-          <div className={`status-item ${filesLoaded.products ? 'loaded' : 'not-loaded'}`}>
-            {filesLoaded.products ? '✓' : '○'} Produits
-          </div>
-          <div className={`status-item ${filesLoaded.transport ? 'loaded' : 'not-loaded'}`}>
-            {filesLoaded.transport ? '✓' : '○'} Transport
-          </div>
-        </div>
       </div>
 
       <div className="main-content">
@@ -397,23 +387,22 @@ function App() {
                 min="1"
                 max="95"
               />
+               {/* Bouton de calcul */}
+              <button
+                className={`btn-calculate ${isCalculating ? 'calculating' : ''}`}
+                onClick={calculerPrixMultiReferences}
+                disabled={isCalculating || !filesLoaded.products || !filesLoaded.transport}
+              >
+                {isCalculating ? (
+                  <div className="loading">
+                    <div className="spinner"></div>
+                    Calcul en cours...
+                  </div>
+                ) : (
+                  '🚀 Calculer le transport'
+                )}
+              </button>
             </div>
-
-            {/* Bouton de calcul */}
-            <button
-              className={`btn-calculate ${isCalculating ? 'calculating' : ''}`}
-              onClick={calculerPrixMultiReferences}
-              disabled={isCalculating || !filesLoaded.products || !filesLoaded.transport}
-            >
-              {isCalculating ? (
-                <div className="loading">
-                  <div className="spinner"></div>
-                  Calcul en cours...
-                </div>
-              ) : (
-                '🚀 Calculer le transport'
-              )}
-            </button>
           </div>
         </div>
 

@@ -68,7 +68,7 @@ html, body {
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 2fr;
   gap: 30px;
   width: 100%;
   max-width: 100%;
