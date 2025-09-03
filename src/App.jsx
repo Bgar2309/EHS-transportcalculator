@@ -328,13 +328,12 @@ function App() {
     <div className="app-container">
       <div className="header">
         <h1 className="title">Calculateur de Transport EHS</h1>
-        <p className="subtitle">Multi-références - Version Web</p>
         <div className="status-bar">
           <div className={`status-item ${filesLoaded.products ? 'loaded' : 'not-loaded'}`}>
-            {filesLoaded.products ? '✓' : '○'} Produits
+            {filesLoaded.products ? '✓' : '○'}
           </div>
           <div className={`status-item ${filesLoaded.transport ? 'loaded' : 'not-loaded'}`}>
-            {filesLoaded.transport ? '✓' : '○'} Transport
+            {filesLoaded.transport ? '✓' : '○'}
           </div>
         </div>
       </div>
@@ -398,23 +397,22 @@ function App() {
                   max="95"
                 />
               </div>
+              {/* Bouton de calcul */}
+              <button
+                className={`btn-calculate ${isCalculating ? 'calculating' : ''}`}
+                onClick={calculerPrixMultiReferences}
+                disabled={isCalculating || !filesLoaded.products || !filesLoaded.transport}
+              >
+                {isCalculating ? (
+                  <div className="loading">
+                    <div className="spinner"></div>
+                    Calcul en cours...
+                  </div>
+                ) : (
+                  '🚀 Calculer le transport'
+                )}
+              </button>
             </div>
-
-            {/* Bouton de calcul */}
-            <button
-              className={`btn-calculate ${isCalculating ? 'calculating' : ''}`}
-              onClick={calculerPrixMultiReferences}
-              disabled={isCalculating || !filesLoaded.products || !filesLoaded.transport}
-            >
-              {isCalculating ? (
-                <div className="loading">
-                  <div className="spinner"></div>
-                  Calcul en cours...
-                </div>
-              ) : (
-                '🚀 Calculer le transport'
-              )}
-            </button>
           </div>
         </div>
 
