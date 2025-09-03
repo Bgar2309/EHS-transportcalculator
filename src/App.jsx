@@ -328,14 +328,6 @@ function App() {
     <div className="app-container">
       <div className="header">
         <h1 className="title">Calculateur de Transport EHS</h1>
-        <div className="status-bar">
-          <div className={`status-item ${filesLoaded.products ? 'loaded' : 'not-loaded'}`}>
-            {filesLoaded.products ? '✓' : '○'}
-          </div>
-          <div className={`status-item ${filesLoaded.transport ? 'loaded' : 'not-loaded'}`}>
-            {filesLoaded.transport ? '✓' : '○'}
-          </div>
-        </div>
       </div>
 
       <div className="main-content">
