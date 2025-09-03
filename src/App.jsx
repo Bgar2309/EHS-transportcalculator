@@ -342,61 +342,62 @@ function App() {
       <div className="main-content">
         <div className="left-panel">
           <div className="card">
-            {/* Section produits */}
             <div className="section-title">
               📋 Produits à expédier
             </div>
 
-            {productLines.map((line, index) => (
-              <div key={index} className="product-line">
-                <select
-                  className="select"
-                  value={line.product}
-                  onChange={(e) => updateProductLine(index, 'product', e.target.value)}
-                >
-                  <option value="">Sélectionner un produit</option>
-                  {Object.keys(PRODUITS_DATA).map(produit => (
-                    <option key={produit} value={produit}>{produit}</option>
-                  ))}
-                </select>
+            <div className="card-content">
+              {productLines.map((line, index) => (
+                <div key={index} className="product-line">
+                  <select
+                    className="select"
+                    value={line.product}
+                    onChange={(e) => updateProductLine(index, 'product', e.target.value)}
+                  >
+                    <option value="">Sélectionner un produit</option>
+                    {Object.keys(PRODUITS_DATA).map(produit => (
+                      <option key={produit} value={produit}>{produit}</option>
+                    ))}
+                  </select>
 
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="Quantité"
+                    value={line.quantity}
+                    onChange={(e) => updateProductLine(index, 'quantity', e.target.value)}
+                  />
+
+                  {index > 0 && (
+                    <button
+                      className="btn btn-remove"
+                      onClick={() => removeProductLine(index)}
+                    >
+                      ✖
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {productLines.length < 4 && (
+                <button className="btn btn-add" onClick={addProductLine}>
+                  + Ajouter un produit
+                </button>
+              )}
+
+              {/* Département */}
+              <div className="department-input">
+                <label>🎯 Département de destination</label>
                 <input
                   type="number"
                   className="input"
-                  placeholder="Quantité"
-                  value={line.quantity}
-                  onChange={(e) => updateProductLine(index, 'quantity', e.target.value)}
+                  placeholder="Ex: 75"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  min="1"
+                  max="95"
                 />
-
-                {index > 0 && (
-                  <button
-                    className="btn btn-remove"
-                    onClick={() => removeProductLine(index)}
-                  >
-                    ✖
-                  </button>
-                )}
               </div>
-            ))}
-
-            {productLines.length < 4 && (
-              <button className="btn btn-add" onClick={addProductLine}>
-                + Ajouter un produit
-              </button>
-            )}
-
-            {/* Département */}
-            <div className="department-input">
-              <label>🎯 Département de destination</label>
-              <input
-                type="number"
-                className="input"
-                placeholder="Ex: 75"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                min="1"
-                max="95"
-              />
             </div>
 
             {/* Bouton de calcul */}
@@ -422,8 +423,13 @@ function App() {
             <div className="section-title">
               📊 Résultats
             </div>
-            <div className="results">
-              {results || 'Sélectionnez vos produits et cliquez sur "Calculer le transport" pour voir les résultats.'}
+            <div className="results-container">
+              <div 
+                className="results"
+                dangerouslySetInnerHTML={{
+                  __html: results || 'Sélectionnez vos produits et cliquez sur "Calculer le transport" pour voir les résultats.'
+                }}
+              />
             </div>
           </div>
         </div>

@@ -66,20 +66,25 @@ html, body {
   color: white;
 }
 
+/* CORRECTION : Hauteur fixe pour éviter les mouvements */
 .main-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 30px;
   width: 100%;
   max-width: 100%;
-  align-items: start;
+  height: 800px; /* Hauteur fixe */
+  align-items: stretch; /* Les deux colonnes prennent la même hauteur */
 }
 
 .left-panel, .right-panel {
   width: 100%;
-  min-height: 600px;
+  height: 100%; /* Prendre toute la hauteur disponible */
+  display: flex;
+  flex-direction: column;
 }
 
+/* CORRECTION : Hauteur fixe pour les cartes */
 .card {
   background: white;
   border-radius: 20px;
@@ -88,7 +93,10 @@ html, body {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   width: 100%;
-  height: 100%;
+  height: 100%; /* Prendre toute la hauteur du parent */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Éviter le débordement */
 }
 
 .section-title {
@@ -99,6 +107,32 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0; /* Ne pas rétrécir */
+}
+
+/* CORRECTION : Conteneur scrollable pour le contenu */
+.card-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.card-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.card-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.card-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+.card-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .product-line {
@@ -111,6 +145,7 @@ html, body {
   border-radius: 12px;
   border: 2px solid transparent;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .product-line:hover {
@@ -164,6 +199,7 @@ html, body {
   color: white;
   margin: 20px 0;
   width: 100%;
+  flex-shrink: 0;
 }
 
 .btn-add:hover {
@@ -182,6 +218,7 @@ html, body {
   justify-content: center;
   font-size: 1.2rem;
   min-width: 40px;
+  flex-shrink: 0;
 }
 
 .btn-remove:hover {
@@ -200,6 +237,7 @@ html, body {
   border-radius: 15px;
   cursor: pointer;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .btn-calculate:hover:not(:disabled) {
@@ -226,6 +264,7 @@ html, body {
   padding: 20px;
   background: #f8fafc;
   border-radius: 15px;
+  flex-shrink: 0;
 }
 
 .department-input label {
@@ -243,6 +282,32 @@ html, body {
 .results-container {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.results {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.results::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.results::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+.results::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .results-placeholder {
@@ -458,10 +523,16 @@ html, body {
   .main-content {
     grid-template-columns: 1fr;
     gap: 20px;
+    height: auto; /* Auto height en mode mobile */
   }
   
   .title {
     font-size: 2rem;
+  }
+  
+  .card {
+    height: auto; /* Auto height en mode mobile */
+    min-height: 600px;
   }
 }
 
@@ -472,6 +543,8 @@ html, body {
   
   .card {
     padding: 20px;
+    height: auto;
+    min-height: 500px;
   }
   
   .product-line {

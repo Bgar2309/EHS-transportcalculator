@@ -22,10 +22,9 @@ a:hover {
   color: #535bf2;
 }
 
+/* CORRECTION : Retirer le flex et place-items qui causent les problèmes */
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
