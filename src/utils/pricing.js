@@ -47,34 +47,39 @@ export const obtenirPrixParType = (poids, departement, typeTransport, compositio
   const data = TRANSPORT_DATA[typeTransport];
   if (!data || data.length === 0) return null;
   
+  // CORRECTION : Ajout de +1 pour compenser le décalage Excel
+  // Ligne 1 Excel (index 0) = en-têtes, ligne 2 Excel (index 1) = sous-en-têtes/vide
+  // Ligne 3 Excel (index 2) = département 01, donc département 1 → index 2 = departement + 1
+  const ligneExcel = departement + 1;
+  
   try {
     if (typeTransport === "Colis (DPD)") {
-      if (poids <= 30 && departement < data.length) {
+      if (poids <= 30 && ligneExcel < data.length) {
         const col = Math.min(Math.floor(poids), 30);
-        if (col >= 1 && data[departement] && data[departement][col] != null) {
-          return parseFloat(data[departement][col]);
+        if (col >= 1 && data[ligneExcel] && data[ligneExcel][col] != null) {
+          return parseFloat(data[ligneExcel][col]);
         }
       }
     } else if (typeTransport === "Messagerie") {
-      if (poids <= 400 && departement < data.length) {
+      if (poids <= 400 && ligneExcel < data.length) {
         const limites = [9,19,29,39,49,59,69,79,89,99,120,140,160,180,200,220,240,260,280,300,325,350,375];
         const colIndex = limites.findIndex(limite => poids <= limite);
-        if (colIndex !== -1 && data[departement] && data[departement][colIndex + 1] != null) {
-          return parseFloat(data[departement][colIndex + 1]);
+        if (colIndex !== -1 && data[ligneExcel] && data[ligneExcel][colIndex + 1] != null) {
+          return parseFloat(data[ligneExcel][colIndex + 1]);
         }
       }
     } else if (typeTransport === "Forfait palette") {
-      if (poids <= 1000 && departement < data.length) {
-        if (data[departement] && data[departement][1] != null) {
-          return parseFloat(data[departement][1]);
+      if (poids <= 1000 && ligneExcel < data.length) {
+        if (data[ligneExcel] && data[ligneExcel][1] != null) {
+          return parseFloat(data[ligneExcel][1]);
         }
       }
     } else if (typeTransport === "Affrètement") {
-      if (departement < data.length) {
+      if (ligneExcel < data.length) {
         if (composition) {
           const colIndex = getColonneAffretement(composition);
-          if (data[departement] && data[departement][colIndex + 1] != null) {
-            return parseFloat(data[departement][colIndex + 1]);
+          if (data[ligneExcel] && data[ligneExcel][colIndex + 1] != null) {
+            return parseFloat(data[ligneExcel][colIndex + 1]);
           }
         } else {
           // Logique fallback par poids
@@ -87,8 +92,8 @@ export const obtenirPrixParType = (poids, departement, typeTransport, compositio
           
           for (let i = 0; i < ranges.length; i++) {
             if (poids >= ranges[i][0] && poids <= ranges[i][1]) {
-              if (data[departement] && data[departement][i + 1] != null) {
-                return parseFloat(data[departement][i + 1]);
+              if (data[ligneExcel] && data[ligneExcel][i + 1] != null) {
+                return parseFloat(data[ligneExcel][i + 1]);
               }
               break;
             }

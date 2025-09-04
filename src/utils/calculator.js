@@ -109,41 +109,34 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
   const capaciteMax = paletteMax.pieces_par_palette;
   const resultats = [];
   
-  // 1. Calculer DPD si possible
+  // 1. VÉRIFIER DPD EN PRIORITÉ
   const varianteCarton = produit.variantes.find(v => v.type_palette === "carton");
   
-  if (varianteCarton && varianteCarton.pieces_par_palette > 0) {
-    const nbCartons = Math.ceil(quantite / varianteCarton.pieces_par_palette);
-    const poidsUnitaire = produit.poids_unitaire;
-    let poidsTotalDpd = 0;
+  // DPD possible seulement si :
+  // - Il existe une variante carton
+  // - La quantité rentre dans UN SEUL carton
+  // - Le transport DPD est autorisé pour ce produit
+  if (varianteCarton && 
+      varianteCarton.pieces_par_palette > 0 && 
+      quantite <= varianteCarton.pieces_par_palette &&
+      varianteCarton.transport && 
+      varianteCarton.transport.some(t => t.toLowerCase().includes("dpd"))) {
     
-    for (let i = 0; i < nbCartons; i++) {
-      let piecesCarton;
-      if (i === nbCartons - 1) {
-        piecesCarton = quantite % varianteCarton.pieces_par_palette;
-        if (piecesCarton === 0) piecesCarton = varianteCarton.pieces_par_palette;
-      } else {
-        piecesCarton = varianteCarton.pieces_par_palette;
-      }
-      
-      const poidsCarton = piecesCarton * poidsUnitaire + varianteCarton.poids_palette;
-      poidsTotalDpd += poidsCarton;
-    }
+    const poidsCarton = quantite * produit.poids_unitaire + varianteCarton.poids_palette;
     
-    if (poidsTotalDpd > 0) {
-      resultats.push({
-        details: `${nbCartons} colis DPD`,
-        type_transport: "Colis (DPD)",
-        poids_total: poidsTotalDpd,
-        hauteur: varianteCarton.hauteur,
-        nb_palettes_total: nbCartons,
-        gaspillage: (nbCartons * varianteCarton.pieces_par_palette) - quantite,
-        composition: [["carton", nbCartons]]
-      });
-    }
+    // RETOUR DIRECT DPD - Pas besoin de calculer le reste
+    return {
+      details: `1 colis DPD (${quantite} pièces)`,
+      type_transport: "Colis (DPD)",
+      poids_total: poidsCarton,
+      hauteur: varianteCarton.hauteur,
+      nb_palettes_total: 1,
+      gaspillage: 0,
+      composition: [["carton", 1]]
+    };
   }
   
-  // 2. Générer les combinaisons de palettes
+  // 2. Si pas de DPD possible, calculer les palettes
   const combinaisons = genererCombinaisons(produitRef, quantite, PRODUITS_DATA);
   
   // 3. Appliquer la logique selon la capacité max
@@ -201,7 +194,7 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
     }
   }
   
-  // Retourner la meilleure option
+  // Retourner la meilleure option pour les palettes
   if (resultats.length > 0) {
     const resultatsTries = resultats.sort((a, b) => 
       (a.nb_palettes_total || 999) - (b.nb_palettes_total || 999) ||

@@ -229,6 +229,11 @@ function App() {
           }
         }
       }
+      // DEBUG - À retirer après
+      console.log("=== DEBUG REVO 22 ===");
+      console.log("Agrégation:", agregation);
+      console.log("Résultats transport:", resultatsTransport);
+      console.log("=====================");
 
       // Construire le résultat final avec HTML pour un meilleur affichage
       let resultat = "";
