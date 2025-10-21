@@ -19,31 +19,37 @@ function App() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [filesLoaded, setFilesLoaded] = useState({ products: false, transport: false });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Chargement automatique des fichiers au démarrage
   useEffect(() => {
     const loadFiles = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         // Charger le fichier produits
         const productsResponse = await fetch('/fichiercone.xlsx');
-        if (productsResponse.ok) {
-          const productsBlob = await productsResponse.blob();
-          const productsFile = new File([productsBlob], 'fichiercone.xlsx');
-          PRODUITS_DATA = await loadProductsData(productsFile);
-          setFilesLoaded(prev => ({ ...prev, products: true }));
+        if (!productsResponse.ok) {
+          throw new Error(`Le fichier de produits n'a pas pu être chargé (erreur ${productsResponse.status}).`);
         }
+        const productsBlob = await productsResponse.blob();
+        const productsFile = new File([productsBlob], 'fichiercone.xlsx');
+        PRODUITS_DATA = await loadProductsData(productsFile);
+        setFilesLoaded(prev => ({ ...prev, products: true }));
 
         // Charger le fichier transport
         const transportResponse = await fetch('/Grille de transport EHS 25.xlsx');
-        if (transportResponse.ok) {
-          const transportBlob = await transportResponse.blob();
-          const transportFile = new File([transportBlob], 'Grille de transport EHS 25.xlsx');
-          TRANSPORT_DATA = await loadTransportData(transportFile);
-          setFilesLoaded(prev => ({ ...prev, transport: true }));
+        if (!transportResponse.ok) {
+          throw new Error(`Le fichier de transport n'a pas pu être chargé (erreur ${transportResponse.status}).`);
         }
+        const transportBlob = await transportResponse.blob();
+        const transportFile = new File([transportBlob], 'Grille de transport EHS 25.xlsx');
+        TRANSPORT_DATA = await loadTransportData(transportFile);
+        setFilesLoaded(prev => ({ ...prev, transport: true }));
+
       } catch (error) {
         console.error('Erreur lors du chargement automatique des fichiers:', error);
+        setError(`Une erreur est survenue : ${error.message}. Veuillez rafraîchir la page.`);
       }
       setIsLoading(false);
     };
@@ -324,6 +330,17 @@ function App() {
           <div className="spinner-large"></div>
           <h2>Chargement des données...</h2>
           <p>Initialisation du calculateur de transport</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-content">
+          <h2>Erreur de chargement</h2>
+          <p>{error}</p>
         </div>
       </div>
     );
