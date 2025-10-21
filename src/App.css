@@ -161,6 +161,7 @@ html, body {
   font-size: 1rem;
   transition: all 0.3s ease;
   background: white;
+  color: #333; /* Correction pour forcer la couleur du texte */
 }
 
 .select:focus, .input:focus {
