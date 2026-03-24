@@ -58,7 +58,6 @@ export const genererCombinaisons = (produitRef, quantite, PRODUITS_DATA) => {
           const poidsTotal = poidsProduits + poidsPalettesVides;
           const hauteurMax = Math.max(grandeVariante.hauteur, petiteVariante.hauteur);
           
-          // Vérifier que c'est mieux qu'une solution simple
           const solutionSimple = Math.min(...combinaisons.map(x => x.nb_palettes_total));
           const gaspillageSimple = Math.min(...combinaisons
             .filter(x => x.nb_palettes_total === solutionSimple)
@@ -86,16 +85,59 @@ export const genererCombinaisons = (produitRef, quantite, PRODUITS_DATA) => {
     .slice(0, 5);
 };
 
+// Retourne la variante 115x115 (palette max) d'un produit
+export const getVariante115x115 = (produitRef, PRODUITS_DATA) => {
+  if (!PRODUITS_DATA[produitRef]) return null;
+  const produit = PRODUITS_DATA[produitRef];
+  return produit.variantes.find(v =>
+    v.type_palette !== 'carton' &&
+    v.pieces_par_palette > 0 &&
+    (v.type_palette.includes('115') || v.type_palette.includes('110') || v.type_palette.includes('120x120'))
+  ) || null;
+};
+
 // Fonction pour identifier la palette maximale d'un produit
 export const getPaletteMax = (produitRef, PRODUITS_DATA) => {
   if (!PRODUITS_DATA[produitRef]) return null;
-  
   const produit = PRODUITS_DATA[produitRef];
   const variantesPalettes = produit.variantes.filter(v => v.type_palette !== "carton" && v.pieces_par_palette > 0);
   if (variantesPalettes.length > 0) {
-    return variantesPalettes[variantesPalettes.length - 1]; // Dernière = palette max
+    return variantesPalettes[variantesPalettes.length - 1];
   }
   return null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RÈGLE PALETTE COMPLÈTE
+// Si quantite % pieces_par_palette_115x115 === 0 → affrètement forcé
+// (palette complète = on ne découpe pas, on expédie tel quel en affrètement)
+// ─────────────────────────────────────────────────────────────────────────────
+export const estPaletteComplete = (produitRef, quantite, PRODUITS_DATA) => {
+  const variante115 = getVariante115x115(produitRef, PRODUITS_DATA);
+  if (!variante115 || variante115.pieces_par_palette <= 0) return false;
+  return quantite % variante115.pieces_par_palette === 0;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RÈGLE MESSAGERIE — LIMITE 800 kg / 2 palettes max (grille Kuehne 2026)
+// Si poids palette > 800 kg OU nb palettes > 2 → affrètement obligatoire
+// ─────────────────────────────────────────────────────────────────────────────
+export const depasseLimiteMessagerie = (paletisation) => {
+  if (!paletisation || paletisation.type_transport === 'Colis (DPD)') return false;
+  
+  const nbPalettes = paletisation.nb_palettes_total || 0;
+  const poids = paletisation.poids_total || 0;
+
+  // Plus de 2 palettes → affrètement
+  if (nbPalettes > 2) return true;
+
+  // 1 palette > 800 kg → affrètement
+  if (nbPalettes === 1 && poids > 800) return true;
+
+  // 2 palettes → poids total max 1600 kg (col 20 de la grille)
+  if (nbPalettes === 2 && poids > 1600) return true;
+
+  return false;
 };
 
 // Fonction pour calculer la palétisation optimale d'une référence
@@ -107,15 +149,10 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
   if (!paletteMax) return null;
   
   const capaciteMax = paletteMax.pieces_par_palette;
-  const resultats = [];
-  
-  // 1. VÉRIFIER DPD EN PRIORITÉ
+
+  // ── 1. VÉRIFIER DPD EN PRIORITÉ ─────────────────────────────────────────
   const varianteCarton = produit.variantes.find(v => v.type_palette === "carton");
   
-  // DPD possible seulement si :
-  // - Il existe une variante carton
-  // - La quantité rentre dans UN SEUL carton
-  // - Le transport DPD est autorisé pour ce produit
   if (varianteCarton && 
       varianteCarton.pieces_par_palette > 0 && 
       quantite <= varianteCarton.pieces_par_palette &&
@@ -124,7 +161,6 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
     
     const poidsCarton = quantite * produit.poids_unitaire + varianteCarton.poids_palette;
     
-    // RETOUR DIRECT DPD - Pas besoin de calculer le reste
     return {
       details: `1 colis DPD (${quantite} pièces)`,
       type_transport: "Colis (DPD)",
@@ -135,32 +171,63 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
       composition: [["carton", 1]]
     };
   }
-  
-  // 2. Si pas de DPD possible, calculer les palettes
+
+  // ── 2. RÈGLE PALETTE COMPLÈTE → AFFRÈTEMENT FORCÉ ───────────────────────
+  // Si la quantité est un multiple exact de la palette 115x115,
+  // on force l'affrètement (palette complète, on ne découpe pas)
+  if (estPaletteComplete(produitRef, quantite, PRODUITS_DATA)) {
+    const combinaisons = genererCombinaisons(produitRef, quantite, PRODUITS_DATA);
+    const meilleure = combinaisons[0];
+    if (meilleure) {
+      return {
+        details: meilleure.details,
+        type_transport: "Affrètement",
+        force_affretement: true,
+        raison_affretement: "palette_complete",
+        poids_total: meilleure.poids_total,
+        hauteur: meilleure.hauteur_max,
+        nb_palettes_total: meilleure.nb_palettes_total,
+        gaspillage: meilleure.gaspillage,
+        composition: meilleure.composition
+      };
+    }
+  }
+
+  // ── 3. CALCUL PALETTES STANDARD ─────────────────────────────────────────
   const combinaisons = genererCombinaisons(produitRef, quantite, PRODUITS_DATA);
+  const resultats = [];
   
-  // 3. Appliquer la logique selon la capacité max
   if (quantite <= capaciteMax) {
     for (const combo of combinaisons) {
       const poids = combo.poids_total;
+      const nbPal = combo.nb_palettes_total;
       let typesATester = [];
-      
-      if (poids <= 400) {
-        typesATester = ["Messagerie", "Forfait palette", "Affrètement"];
-      } else if (poids <= 1000) {
-        typesATester = ["Forfait palette", "Affrètement"];
+
+      // ── RÈGLE 800 kg / 2 palettes (messagerie Kuehne 2026) ───────────
+      // Messagerie possible seulement si :
+      //   - 1 palette ET poids <= 800 kg → col 19 (260-800 kg)
+      //   - 2 palettes ET poids <= 1600 kg → col 20 (801-1600 kg)
+      //   - Poids <= 240 kg → tranches classiques
+      const messagerieOk = (
+        (nbPal === 1 && poids <= 800) ||
+        (nbPal === 2 && poids <= 1600) ||
+        (poids <= 240)
+      );
+
+      if (messagerieOk) {
+        typesATester = ["Messagerie", "Affrètement"];
       } else {
         typesATester = ["Affrètement"];
       }
+
+      const piecesTotales = combo.composition.reduce((total, [typePal, nb]) => {
+        const variante = produit.variantes.find(v => v.type_palette === typePal);
+        return total + (nb * (variante ? variante.pieces_par_palette : 0));
+      }, 0);
+      
+      const gaspillage = piecesTotales - quantite;
       
       for (const typeTransport of typesATester) {
-        const piecesTotales = combo.composition.reduce((total, [typePal, nb]) => {
-          const variante = produit.variantes.find(v => v.type_palette === typePal);
-          return total + (nb * (variante ? variante.pieces_par_palette : 0));
-        }, 0);
-        
-        const gaspillage = piecesTotales - quantite;
-        
         resultats.push({
           details: combo.details,
           type_transport: typeTransport,
@@ -173,14 +240,12 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
       }
     }
   } else {
-    // > Capacité palette max : AFFRÈTEMENT UNIQUEMENT
+    // > Capacité palette max → AFFRÈTEMENT UNIQUEMENT
     for (const combo of combinaisons) {
       const piecesTotales = combo.composition.reduce((total, [typePal, nb]) => {
         const variante = produit.variantes.find(v => v.type_palette === typePal);
         return total + (nb * (variante ? variante.pieces_par_palette : 0));
       }, 0);
-      
-      const gaspillage = piecesTotales - quantite;
       
       resultats.push({
         details: combo.details,
@@ -188,19 +253,17 @@ export const calculerPaletisationReference = (produitRef, quantite, PRODUITS_DAT
         poids_total: combo.poids_total,
         hauteur: combo.hauteur_max,
         nb_palettes_total: combo.nb_palettes_total,
-        gaspillage: gaspillage,
+        gaspillage: piecesTotales - quantite,
         composition: combo.composition
       });
     }
   }
   
-  // Retourner la meilleure option pour les palettes
   if (resultats.length > 0) {
-    const resultatsTries = resultats.sort((a, b) => 
+    return resultats.sort((a, b) => 
       (a.nb_palettes_total || 999) - (b.nb_palettes_total || 999) ||
       (a.gaspillage || 999) - (b.gaspillage || 999)
-    );
-    return resultatsTries[0];
+    )[0];
   }
   
   return null;
