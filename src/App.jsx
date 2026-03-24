@@ -79,7 +79,6 @@ function App() {
         return;
       }
 
-      // Collecter les références valides
       const referencesValides = [];
       productLines.forEach(line => {
         const quantite = parseInt(line.quantity);
@@ -93,7 +92,6 @@ function App() {
         return;
       }
 
-      // Calculer la palétisation pour chaque référence
       const paletisationsIndividuelles = [];
       for (const [produitRef, quantite] of referencesValides) {
         const paletisation = calculerPaletisationReference(produitRef, quantite, PRODUITS_DATA);
@@ -109,16 +107,16 @@ function App() {
         return;
       }
 
-      // Agréger les palétisations
       const agregation = agregerPaletisations(paletisationsIndividuelles);
 
-      // ─── Détecter si palette complète forcée ──────────────────────────────
-      const hasPaletteComplete = paletisationsIndividuelles.some(p => p.force_affretement && p.raison_affretement === 'palette_complete');
+      const hasPaletteComplete = paletisationsIndividuelles.some(
+        p => p.force_affretement && p.raison_affretement === 'palette_complete'
+      );
 
-      // ─── Calculer les prix de transport ───────────────────────────────────
+      // ─── Calcul des prix ──────────────────────────────────────────────────
       const resultatsTransport = [];
 
-      // 1. DPD — uniquement si mono-référence et toutes les paletisations sont DPD
+      // 1. DPD
       if (agregation.nb_colis_dpd > 0 && referencesValides.length === 1) {
         let prixTotalDpd = 0;
         let poidsTotalDpd = 0;
@@ -159,7 +157,7 @@ function App() {
         }
       }
 
-      // 2. Palettes — messagerie et/ou affrètement selon les règles grille 2026
+      // 2. Palettes
       if (agregation.composition_globale.length > 0) {
         const poidsTotalDpdSoustraire = agregation.nb_colis_dpd > 0 && referencesValides.length === 1
           ? agregation.details_individuels
@@ -169,58 +167,63 @@ function App() {
 
         const poidsPalettes = agregation.poids_total - poidsTotalDpdSoustraire;
         const nbPalettesTotal = agregation.composition_globale.reduce((sum, [, nb]) => sum + nb, 0);
+        const labelPalettes = `${nbPalettesTotal} palette(s) - ${agregation.composition_globale.map(([type, nb]) => `${nb}x${type}`).join(', ')}`;
 
-        // ── Déterminer les types possibles (grille Kuehne 2026) ────────────
-        // Messagerie OK si :
-        //   poids <= 240 kg (tranches classiques)
-        //   OU 1 palette ET poids <= 800 kg
-        //   OU 2 palettes ET poids <= 1600 kg
-        // Palette complète → affrètement uniquement
-        const messagerieOk = !hasPaletteComplete && (
-          poidsPalettes <= 240 ||
-          (nbPalettesTotal === 1 && poidsPalettes <= 800) ||
-          (nbPalettesTotal === 2 && poidsPalettes <= 1600)
-        );
-
-        // Multi-références avec DPD : proposer messagerie si applicable
-        if (referencesValides.length > 1 && agregation.nb_colis_dpd > 0 && agregation.composition_globale.length === 0) {
-          if (messagerieOk) {
-            const prixMsg = obtenirPrixParType(poidsPalettes, dept, 'Messagerie', null, TRANSPORT_DATA);
-            if (prixMsg) {
-              resultatsTransport.push({
-                type_transport: 'Messagerie',
-                prix: prixMsg,
-                poids: poidsPalettes,
-                details: `Messagerie globale (${agregation.nb_colis_dpd} colis regroupés)`
-              });
-            }
+        // ── CAS 1 : Palette complète → affrètement forcé ──────────────────
+        if (hasPaletteComplete) {
+          const prix = obtenirPrixParType(poidsPalettes, dept, 'Affrètement', agregation.composition_globale, TRANSPORT_DATA);
+          if (prix) {
+            resultatsTransport.push({ type_transport: 'Affrètement', prix, poids: poidsPalettes, details: labelPalettes, force: true });
           }
         }
 
-        const typesATester = [];
-        if (messagerieOk) typesATester.push('Messagerie');
-        typesATester.push('Affrètement');
-
-        for (const typeTransport of typesATester) {
-          const prix = obtenirPrixParType(poidsPalettes, dept, typeTransport, agregation.composition_globale, TRANSPORT_DATA);
-          if (prix) {
+        // ── CAS 2 : Poids > 800 kg et ≤ 1600 kg → comparer messagerie vs affrètement ──
+        else if (poidsPalettes > 800 && poidsPalettes <= 1600) {
+          // Option A : Messagerie Kuehne 2 palettes (col 20 : 801-1600 kg)
+          const prixMsg = obtenirPrixParType(poidsPalettes, dept, 'Messagerie', null, TRANSPORT_DATA);
+          if (prixMsg) {
             resultatsTransport.push({
-              type_transport: typeTransport,
-              prix: prix,
+              type_transport: 'Messagerie',
+              prix: prixMsg,
               poids: poidsPalettes,
-              details: `${nbPalettesTotal} palette(s) - ${agregation.composition_globale.map(([type, nb]) => `${nb}x${type}`).join(', ')}`
+              details: `2 palettes — ${agregation.composition_globale.map(([type, nb]) => `${nb}x${type}`).join(', ')}`
             });
+          }
+          // Option B : Affrètement
+          const prixAff = obtenirPrixParType(poidsPalettes, dept, 'Affrètement', agregation.composition_globale, TRANSPORT_DATA);
+          if (prixAff) {
+            resultatsTransport.push({ type_transport: 'Affrètement', prix: prixAff, poids: poidsPalettes, details: labelPalettes });
+          }
+        }
+
+        // ── CAS 3 : Poids > 1600 kg → affrètement uniquement ─────────────
+        else if (poidsPalettes > 1600) {
+          const prix = obtenirPrixParType(poidsPalettes, dept, 'Affrètement', agregation.composition_globale, TRANSPORT_DATA);
+          if (prix) {
+            resultatsTransport.push({ type_transport: 'Affrètement', prix, poids: poidsPalettes, details: labelPalettes });
+          }
+        }
+
+        // ── CAS 4 : Poids ≤ 800 kg → messagerie et affrètement disponibles ─
+        else {
+          const prixMsg = obtenirPrixParType(poidsPalettes, dept, 'Messagerie', null, TRANSPORT_DATA);
+          if (prixMsg) {
+            resultatsTransport.push({ type_transport: 'Messagerie', prix: prixMsg, poids: poidsPalettes, details: labelPalettes });
+          }
+          const prixAff = obtenirPrixParType(poidsPalettes, dept, 'Affrètement', agregation.composition_globale, TRANSPORT_DATA);
+          if (prixAff) {
+            resultatsTransport.push({ type_transport: 'Affrètement', prix: prixAff, poids: poidsPalettes, details: labelPalettes });
           }
         }
       }
 
-      // ─── Construire le HTML de résultat ───────────────────────────────────
+      // ─── HTML résultat ────────────────────────────────────────────────────
       let resultat = '';
 
       if (resultatsTransport.length > 0) {
-        const solutionOptimale = resultatsTransport.sort((a, b) => a.prix - b.prix)[0];
+        const tries = resultatsTransport.sort((a, b) => a.prix - b.prix);
+        const solutionOptimale = tries[0];
 
-        // Alerte palette complète
         if (hasPaletteComplete) {
           resultat += '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px 20px;margin-bottom:16px;color:#856404;font-size:14px;">';
           resultat += '⚠️ <strong>Palette complète détectée</strong> — expédition en affrètement uniquement (palette non démontée)';
@@ -229,52 +232,41 @@ function App() {
 
         resultat += '<div class="cout-transport-bloc">';
         resultat += '<div class="cout-label">COÛT TRANSPORT</div>';
-
         if (solutionOptimale.type_transport === 'Colis (DPD)') {
           resultat += `<div class="cout-prix">${solutionOptimale.prix.toFixed(2)} €</div>`;
         } else {
           resultat += `<div class="cout-prix">${Math.round(solutionOptimale.prix)} €</div>`;
         }
-
         resultat += `<div class="cout-mode">${solutionOptimale.type_transport}</div>`;
         resultat += `<div class="cout-details">${solutionOptimale.details}</div>`;
         resultat += '</div>';
 
-        // Autres options
-        const autresSolutions = resultatsTransport.filter((_, i) => i > 0);
+        const autresSolutions = tries.slice(1);
         if (autresSolutions.length > 0) {
           resultat += '<div class="autres-options-bloc">';
           resultat += '<div class="autres-title">💡 AUTRES OPTIONS DISPONIBLES:</div>';
           autresSolutions.forEach(option => {
-            if (option.type_transport === 'Colis (DPD)') {
-              resultat += `<div class="autre-option">• ${option.details} — ${option.prix.toFixed(2)} € (${option.type_transport})</div>`;
-            } else {
-              resultat += `<div class="autre-option">• ${option.details} — ${Math.round(option.prix)} € (${option.type_transport})</div>`;
-            }
+            const prix = option.type_transport === 'Colis (DPD)' ? option.prix.toFixed(2) : Math.round(option.prix);
+            resultat += `<div class="autre-option">• ${option.details} — ${prix} € (${option.type_transport})</div>`;
           });
           resultat += '</div>';
         }
       } else {
-        // Aucun prix trouvé
         resultat += '<div style="background:#f8d7da;border:1px solid #f5c2c7;border-radius:10px;padding:20px;text-align:center;color:#842029;">';
         resultat += '<strong>⚠️ Tarif sur devis</strong><br>Cette commande dépasse les seuils de la grille tarifaire automatique.<br>Traitement manuel requis.';
         resultat += '</div>';
       }
 
-      // Informations complémentaires
       resultat += '<div class="infos-complementaires">';
       resultat += `<div><strong>⚖️ Poids total:</strong> ${agregation.poids_total.toFixed(1)} kg</div>`;
       resultat += `<div><strong>📍 Destination:</strong> Département ${dept}</div>`;
       resultat += `<div><strong>📏 Hauteur max:</strong> ${agregation.hauteur_max} cm</div>`;
-      if (agregation.nb_colis_dpd > 0) {
-        resultat += `<div><strong>📦 Colis DPD:</strong> ${agregation.nb_colis_dpd}</div>`;
-      }
+      if (agregation.nb_colis_dpd > 0) resultat += `<div><strong>📦 Colis DPD:</strong> ${agregation.nb_colis_dpd}</div>`;
       if (agregation.composition_globale.length > 0) {
         resultat += `<div><strong>🏗️ Palettes:</strong> ${agregation.composition_globale.map(([type, nb]) => `${nb}x${type}`).join(' ')}</div>`;
       }
       resultat += '</div>';
 
-      // Détails techniques
       resultat += '<details class="details-techniques">';
       resultat += '<summary><strong>📋 DÉTAILS TECHNIQUES</strong></summary>';
       resultat += '<div class="detail-references"><h4>Détail par référence:</h4>';
@@ -285,12 +277,8 @@ function App() {
         resultat += `&nbsp;&nbsp;${produit.description}<br>`;
         resultat += `&nbsp;&nbsp;Palétisation: ${paletisation.details}<br>`;
         resultat += `&nbsp;&nbsp;Poids: ${paletisation.poids_total.toFixed(1)} kg`;
-        if (paletisation.force_affretement) {
-          resultat += `<br>&nbsp;&nbsp;⚠️ Affrètement forcé — palette complète`;
-        }
-        if (paletisation.gaspillage > 0) {
-          resultat += `<br>&nbsp;&nbsp;Gaspillage: ${paletisation.gaspillage} pièces`;
-        }
+        if (paletisation.force_affretement) resultat += `<br>&nbsp;&nbsp;⚠️ Affrètement forcé — palette complète`;
+        if (paletisation.gaspillage > 0) resultat += `<br>&nbsp;&nbsp;Gaspillage: ${paletisation.gaspillage} pièces`;
         resultat += `</div>`;
       });
       resultat += '</div></details>';
@@ -326,9 +314,7 @@ function App() {
       <div className="main-content">
         <div className="left-panel">
           <div className="card">
-            <div className="section-title">
-              📋 Produits à expédier
-            </div>
+            <div className="section-title">📋 Produits à expédier</div>
 
             <div className="card-content">
               {productLines.map((line, index) => (
@@ -353,20 +339,13 @@ function App() {
                   />
 
                   {index > 0 && (
-                    <button
-                      className="btn btn-remove"
-                      onClick={() => removeProductLine(index)}
-                    >
-                      ✖
-                    </button>
+                    <button className="btn btn-remove" onClick={() => removeProductLine(index)}>✖</button>
                   )}
                 </div>
               ))}
 
               {productLines.length < 4 && (
-                <button className="btn btn-add" onClick={addProductLine}>
-                  + Ajouter un produit
-                </button>
+                <button className="btn btn-add" onClick={addProductLine}>+ Ajouter un produit</button>
               )}
 
               <div className="department-input">
@@ -388,10 +367,7 @@ function App() {
                 disabled={isCalculating || !filesLoaded.products || !filesLoaded.transport}
               >
                 {isCalculating ? (
-                  <div className="loading">
-                    <div className="spinner"></div>
-                    Calcul en cours...
-                  </div>
+                  <div className="loading"><div className="spinner"></div>Calcul en cours...</div>
                 ) : (
                   '🚀 Calculer le transport'
                 )}
@@ -402,9 +378,7 @@ function App() {
 
         <div className="right-panel">
           <div className="card">
-            <div className="section-title">
-              📊 Résultats
-            </div>
+            <div className="section-title">📊 Résultats</div>
             <div className="results-container">
               <div
                 className="results"
