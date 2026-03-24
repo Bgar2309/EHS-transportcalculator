@@ -56,6 +56,7 @@ export const loadProductsData = (file) => {
 };
 
 // Chargement des données de transport depuis Excel
+// Grille 2026 : onglets Colis (DPD), Messagerie (Kuehne), Affretement
 export const loadTransportData = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
